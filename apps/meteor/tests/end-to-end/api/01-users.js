@@ -44,30 +44,35 @@ describe('[Users]', function () {
 
 	before((done) => getCredentials(done));
 
-	it('enabling E2E in server and generating keys to user...', async () => {
-		await updateSetting('E2E_Enable', true);
-		await request
-			.post(api('e2e.setUserPublicAndPrivateKeys'))
-			.set(credentials)
-			.send({
-				private_key: 'test',
-				public_key: 'test',
-			})
-			.expect('Content-Type', 'application/json')
-			.expect(200)
-			.expect((res) => {
-				expect(res.body).to.have.property('success', true);
-			});
-		await request
-			.get(api('e2e.fetchMyKeys'))
-			.set(credentials)
-			.expect('Content-Type', 'application/json')
-			.expect(200)
-			.expect((res) => {
-				expect(res.body).to.have.property('success', true);
-				expect(res.body).to.have.property('public_key', 'test');
-				expect(res.body).to.have.property('private_key', 'test');
-			});
+	const keyValues = [
+		{ private_key: 'test1', public_key: 'test1' },
+		{ private_key: 'test2', public_key: 'test2' },
+		// Add more key pairs as needed
+	];
+
+	keyValues.forEach((keys) => {
+		it(`enabling E2E in server and generating keys to user with keys ${keys.private_key} and ${keys.public_key}`, async () => {
+			await updateSetting('E2E_Enable', true);
+			await request
+				.post(api('e2e.setUserPublicAndPrivateKeys'))
+				.set(credentials)
+				.send(keys)
+				.expect('Content-Type', 'application/json')
+				.expect(200)
+				.expect((res) => {
+					expect(res.body).to.have.property('success', true);
+				});
+			await request
+				.get(api('e2e.fetchMyKeys'))
+				.set(credentials)
+				.expect('Content-Type', 'application/json')
+				.expect(200)
+				.expect((res) => {
+					expect(res.body).to.have.property('success', true);
+					expect(res.body).to.have.property('public_key', keys.public_key);
+					expect(res.body).to.have.property('private_key', keys.private_key);
+				});
+		});
 	});
 
 	describe('[/users.create]', () => {
@@ -114,42 +119,60 @@ describe('[Users]', function () {
 				.expect(200);
 		});
 
-		it('should create a new user with custom fields', (done) => {
-			setCustomFields({ customFieldText }, (error) => {
-				if (error) {
-					return done(error);
-				}
+		const testCases = [
+			{
+				description: 'should create a new user with custom fields scenario 1',
+				customField: 'customValue1',
+				apiUsername: 'username1',
+				apiEmail: 'email1@example.com',
+			},
+			{
+				description: 'should create a new user with custom fields scenario 2',
+				customField: 'customValue2',
+				apiUsername: 'username2',
+				apiEmail: 'email2@example.com',
+			},
+			// Add more test cases as needed
+		];
 
-				const username = `customField_${apiUsername}`;
-				const email = `customField_${apiEmail}`;
-				const customFields = { customFieldText: 'success' };
+		testCases.forEach((testCase) => {
+			it(testCase.description, (done) => {
+				setCustomFields({ customFieldText: testCase.customField }, (error) => {
+					if (error) {
+						return done(error);
+					}
 
-				request
-					.post(api('users.create'))
-					.set(credentials)
-					.send({
-						email,
-						name: username,
-						username,
-						password,
-						active: true,
-						roles: ['user'],
-						joinDefaultChannels: true,
-						verified: true,
-						customFields,
-					})
-					.expect('Content-Type', 'application/json')
-					.expect(200)
-					.expect((res) => {
-						expect(res.body).to.have.property('success', true);
-						expect(res.body).to.have.nested.property('user.username', username);
-						expect(res.body).to.have.nested.property('user.emails[0].address', email);
-						expect(res.body).to.have.nested.property('user.active', true);
-						expect(res.body).to.have.nested.property('user.name', username);
-						expect(res.body).to.have.nested.property('user.customFields.customFieldText', 'success');
-						expect(res.body).to.not.have.nested.property('user.e2e');
-					})
-					.end(done);
+					const username = `customField_${testCase.apiUsername}`;
+					const email = `customField_${testCase.apiEmail}`;
+					const customFields = { customFieldText: testCase.customField };
+
+					request
+						.post(api('users.create'))
+						.set(credentials)
+						.send({
+							email,
+							name: username,
+							username,
+							password,
+							active: true,
+							roles: ['user'],
+							joinDefaultChannels: true,
+							verified: true,
+							customFields,
+						})
+						.expect('Content-Type', 'application/json')
+						.expect(200)
+						.expect((res) => {
+							expect(res.body).to.have.property('success', true);
+							expect(res.body).to.have.nested.property('user.username', username);
+							expect(res.body).to.have.nested.property('user.emails[0].address', email);
+							expect(res.body).to.have.nested.property('user.active', true);
+							expect(res.body).to.have.nested.property('user.name', username);
+							expect(res.body).to.have.nested.property('user.customFields.customFieldText', testCase.customField);
+							expect(res.body).to.not.have.nested.property('user.e2e');
+						})
+						.end(done);
+				});
 			});
 		});
 
