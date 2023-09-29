@@ -79,44 +79,51 @@ describe('[Users]', function () {
 		before((done) => clearCustomFields(done));
 		after((done) => clearCustomFields(done));
 
-		it('should create a new user', async () => {
-			await request
-				.post(api('users.create'))
-				.set(credentials)
-				.send({
-					email: apiEmail,
-					name: apiUsername,
-					username: apiUsername,
-					password,
-					active: true,
-					roles: ['user'],
-					joinDefaultChannels: true,
-					verified: true,
-				})
-				.expect('Content-Type', 'application/json')
-				.expect(200)
-				.expect((res) => {
-					expect(res.body).to.have.property('success', true);
-					expect(res.body).to.have.nested.property('user.username', apiUsername);
-					expect(res.body).to.have.nested.property('user.emails[0].address', apiEmail);
-					expect(res.body).to.have.nested.property('user.active', true);
-					expect(res.body).to.have.nested.property('user.name', apiUsername);
-					expect(res.body).to.not.have.nested.property('user.e2e');
+		const users = [
+			{ email: 'apiEmail1@test.com', name: 'apiUsername1', username: 'apiUsername1', password: 'password1' },
+			{ email: 'apiEmail2@test.com', name: 'apiUsername2', username: 'apiUsername2', password: 'password2' },
+		];
 
-					expect(res.body).to.not.have.nested.property('user.customFields');
+		users.forEach((user) => {
+			it(`should create a new user with email ${user.email}`, async () => {
+				await request
+					.post(api('users.create'))
+					.set(credentials)
+					.send({
+						email: user.email,
+						name: user.name,
+						username: user.username,
+						password: user.password,
+						active: true,
+						roles: ['user'],
+						joinDefaultChannels: true,
+						verified: true,
+					})
+					.expect('Content-Type', 'application/json')
+					.expect(200)
+					.expect((res) => {
+						expect(res.body).to.have.property('success', true);
+						expect(res.body).to.have.nested.property('user.username', user.username);
+						expect(res.body).to.have.nested.property('user.emails[0].address', user.email);
+						expect(res.body).to.have.nested.property('user.active', true);
+						expect(res.body).to.have.nested.property('user.name', user.name);
+						expect(res.body).to.not.have.nested.property('user.e2e');
 
-					targetUser._id = res.body.user._id;
-					targetUser.username = res.body.user.username;
-				});
+						expect(res.body).to.not.have.nested.property('user.customFields');
 
-			await request
-				.post(api('login'))
-				.send({
-					user: apiUsername,
-					password,
-				})
-				.expect('Content-Type', 'application/json')
-				.expect(200);
+						targetUser._id = res.body.user._id;
+						targetUser.username = res.body.user.username;
+					});
+
+				await request
+					.post(api('login'))
+					.send({
+						user: user.username,
+						password: user.password,
+					})
+					.expect('Content-Type', 'application/json')
+					.expect(200);
+			});
 		});
 
 		const testCases = [
