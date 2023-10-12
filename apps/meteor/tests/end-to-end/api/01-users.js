@@ -2,6 +2,7 @@ import crypto from 'crypto';
 
 import { Random } from '@rocket.chat/random';
 import { expect } from 'chai';
+import fc from 'fast-check';
 import { after, afterEach, before, beforeEach, describe, it } from 'mocha';
 
 import { sleep } from '../../../lib/utils/sleep';
@@ -22,7 +23,7 @@ import { customFieldText, clearCustomFields, setCustomFields } from '../../data/
 import { imgURL } from '../../data/interactions.js';
 import { updatePermission, updateSetting } from '../../data/permissions.helper';
 import { createRoom } from '../../data/rooms.helper';
-import { adminEmail, preferences, password, adminUsername } from '../../data/user';
+import { adminEmail, preferences, password, adminUsername, username } from '../../data/user';
 import { createUser, login, deleteUser, getUserStatus, getUserByUsername } from '../../data/users.helper.js';
 
 async function createChannel(userCredentials, name) {
@@ -80,12 +81,22 @@ describe('[Users]', function () {
 		after((done) => clearCustomFields(done));
 
 		const users = [
-			{ email: 'apiEmail1@test.com', name: 'apiUsername1', username: 'apiUsername1', password: 'password1' },
-			{ email: 'apiEmail2@test.com', name: 'apiUsername2', username: 'apiUsername2', password: 'password2' },
+			{
+				email: 'jweiofjsadklfjjoijwdfkln123adklfj@email.com',
+				name: 'asdfasdfasdf',
+				username: 'asdfadsfasdfadsf',
+				password: '12345678',
+			},
+			{ email: 'example@..com', name: 'InvalidName4', username: 'InvalidUsername4', password: 'InvalidPassword4' },
+			{ email: 'ex..ample@example.com', name: 'InvalidName5', username: 'InvalidUsername5', password: 'InvalidPassword5' },
+			{ email: 'example@exam!ple.com', name: 'InvalidName6', username: 'InvalidUsername6', password: 'InvalidPassword6' },
+			{ email: 'ex!ample@example.com', name: 'InvalidName7', username: 'InvalidUsername7', password: 'InvalidPassword7' },
+			{ email: ' example@example.com', name: 'InvalidName8', username: 'InvalidUsername8', password: 'InvalidPassword8' },
+			{ email: 'example@example.com ', name: 'InvalidName9', username: 'InvalidUsername9', password: 'InvalidPassword9' },
 		];
 
 		users.forEach((user) => {
-			it(`should create a new user with email ${user.email}`, async () => {
+			it.only(`should create a new user with email ${user.email}`, async () => {
 				await request
 					.post(api('users.create'))
 					.set(credentials)
@@ -359,28 +370,118 @@ describe('[Users]', function () {
 				.end(done);
 		});
 	});
+	describe('fuzz testing', () => {
+		it('should register new user fuzz', async () => {
+			// Note: Removed done here.
+			await // Note: Wrapped in promise.
+			fc.assert(
+				fc.asyncProperty(
+					fc.nat().map((randomString) => `asdjfadjf@${randomString}.com`),
+					fc.nat().map((randomString) => `jadfk${randomString}`),
+					(email, name) => {
+						return new Promise((innerResolve, innerReject) => {
+							// Note: Inner promise.
+							console.log('name: ', name);
+							request
+								.post(api('users.register'))
+								.send({
+									email,
+									name,
+									username: name,
+									pass: 'test',
+								})
+								.expect('Content-Type', 'application/json')
+								.expect(200)
+								.expect((res) => {
+									expect(res.body).to.have.property('success', true);
+									expect(res.body).to.have.nested.property('user.username', name);
+									expect(res.body).to.have.nested.property('user.active', true);
+									expect(res.body).to.have.nested.property('user.name', name);
+								})
+								.end((err) => {
+									if (err) {
+										innerReject(err);
+									} else {
+										innerResolve();
+									}
+								});
+						});
+					},
+				),
+				{ verbose: true },
+			);
+		});
+	});
 
 	describe('[/users.info]', () => {
 		after(() => {
 			updatePermission('view-other-user-channels', ['admin']);
 			updatePermission('view-full-other-user-info', ['admin']);
 		});
-
-		it('should return an error when the user does not exist', (done) => {
-			request
-				.get(api('users.info'))
-				.set(credentials)
-				.query({
-					username: 'invalid-username',
-				})
-				.expect('Content-Type', 'application/json')
-				.expect(400)
-				.expect((res) => {
-					expect(res.body).to.have.property('success', false);
-					expect(res.body).to.have.property('error');
-				})
-				.end(done);
+		it('should return an error when the user does not exist fuzzing', async () => {
+			await fc.assert(
+				fc.asyncProperty(
+					fc.nat().map((randomString) => `lkajdfijain${randomString}`),
+					async (name) => {
+						return new Promise((innerResolve, innerReject) => {
+							request
+								.get(api('users.info'))
+								.set(credentials)
+								.query({
+									username: name,
+								})
+								.expect('Content-Type', 'application/json')
+								.expect(400)
+								.expect((res) => {
+									console.log('res.body: ', res.body);
+									expect(res.body).to.have.property('success', false);
+									expect(res.body).to.have.property('error');
+								})
+								.end((err) => {
+									if (err) {
+										innerReject(err);
+									} else {
+										innerResolve();
+									}
+								});
+						});
+					},
+				),
+				{ verbose: true },
+			);
 		});
+
+		// TODO: fuzzing
+		it('should return an error when the user does not exist', async () => {
+			await fc.assert(
+				fc.asyncProperty(fc.string({ minLength: 3 }), async (name) => {
+					return new Promise((innerResolve, innerReject) => {
+						console.log('username: ', name);
+						request
+							.get(api('users.info'))
+							.set(credentials)
+							.query({
+								username: name,
+							})
+							.expect('Content-Type', 'application/json')
+							.expect(400)
+							.expect((res) => {
+								expect(res.body).to.have.property('success', false);
+								expect(res.body).to.have.property('error');
+							})
+							.end((err) => {
+								if (err) {
+									innerReject(err);
+								} else {
+									innerResolve();
+								}
+							});
+					});
+				}),
+				{ verbose: true },
+			);
+		});
+
 		it('should query information about a user by userId', (done) => {
 			request
 				.get(api('users.info'))
