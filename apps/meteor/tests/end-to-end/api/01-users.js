@@ -322,7 +322,7 @@ describe('[Users]', function () {
 					.end(done);
 			});
 
-			it.only(`should return an error when trying to register a new user with an existing email: ${email} and username: ${username}`, (done) => {
+			it(`should return an error when trying to register a new user with an existing email: ${email} and username: ${username}`, (done) => {
 				request
 					.post(api('users.register'))
 					.send({
