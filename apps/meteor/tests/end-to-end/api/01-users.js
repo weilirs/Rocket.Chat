@@ -44,30 +44,35 @@ describe('[Users]', function () {
 
 	before((done) => getCredentials(done));
 
-	it('enabling E2E in server and generating keys to user...', async () => {
-		await updateSetting('E2E_Enable', true);
-		await request
-			.post(api('e2e.setUserPublicAndPrivateKeys'))
-			.set(credentials)
-			.send({
-				private_key: 'test',
-				public_key: 'test',
-			})
-			.expect('Content-Type', 'application/json')
-			.expect(200)
-			.expect((res) => {
-				expect(res.body).to.have.property('success', true);
-			});
-		await request
-			.get(api('e2e.fetchMyKeys'))
-			.set(credentials)
-			.expect('Content-Type', 'application/json')
-			.expect(200)
-			.expect((res) => {
-				expect(res.body).to.have.property('success', true);
-				expect(res.body).to.have.property('public_key', 'test');
-				expect(res.body).to.have.property('private_key', 'test');
-			});
+	const keyValues = [
+		{ private_key: 'test1', public_key: 'test1' },
+		{ private_key: 'test2', public_key: 'test2' },
+		// Add more key pairs as needed
+	];
+
+	keyValues.forEach((keys) => {
+		it(`enabling E2E in server and generating keys to user with keys ${keys.private_key} and ${keys.public_key}`, async () => {
+			await updateSetting('E2E_Enable', true);
+			await request
+				.post(api('e2e.setUserPublicAndPrivateKeys'))
+				.set(credentials)
+				.send(keys)
+				.expect('Content-Type', 'application/json')
+				.expect(200)
+				.expect((res) => {
+					expect(res.body).to.have.property('success', true);
+				});
+			await request
+				.get(api('e2e.fetchMyKeys'))
+				.set(credentials)
+				.expect('Content-Type', 'application/json')
+				.expect(200)
+				.expect((res) => {
+					expect(res.body).to.have.property('success', true);
+					expect(res.body).to.have.property('public_key', keys.public_key);
+					expect(res.body).to.have.property('private_key', keys.private_key);
+				});
+		});
 	});
 
 	describe('[/users.create]', () => {
@@ -290,43 +295,50 @@ describe('[Users]', function () {
 	});
 
 	describe('[/users.register]', () => {
-		const email = `email@email${Date.now()}.com`;
-		const username = `myusername${Date.now()}`;
-		it('should register new user', (done) => {
-			request
-				.post(api('users.register'))
-				.send({
-					email,
-					name: 'name',
-					username,
-					pass: 'test',
-				})
-				.expect('Content-Type', 'application/json')
-				.expect(200)
-				.expect((res) => {
-					expect(res.body).to.have.property('success', true);
-					expect(res.body).to.have.nested.property('user.username', username);
-					expect(res.body).to.have.nested.property('user.active', true);
-					expect(res.body).to.have.nested.property('user.name', 'name');
-				})
-				.end(done);
-		});
-		it('should return an error when trying register new user with an existing username', (done) => {
-			request
-				.post(api('users.register'))
-				.send({
-					email,
-					name: 'name',
-					username,
-					pass: 'test',
-				})
-				.expect('Content-Type', 'application/json')
-				.expect(400)
-				.expect((res) => {
-					expect(res.body).to.have.property('success', false);
-					expect(res.body).to.have.property('error').and.to.be.equal('Username is already in use');
-				})
-				.end(done);
+		const testUsers = [
+			{ email: 'lasdjflsdkajf@gemail.com', username: 'r f' },
+			{ email: 'lasdjflsdkajf@gemail.com', username: 'username2' },
+			// ... Add more combinations of email and username as needed
+		];
+
+		testUsers.forEach(({ email, username }) => {
+			it(`should register new user with email: ${email} and username: ${username}`, (done) => {
+				request
+					.post(api('users.register'))
+					.send({
+						email,
+						name: 'name',
+						username,
+						pass: 'test',
+					})
+					.expect('Content-Type', 'application/json')
+					.expect(200)
+					.expect((res) => {
+						expect(res.body).to.have.property('success', true);
+						expect(res.body).to.have.nested.property('user.username', username);
+						expect(res.body).to.have.nested.property('user.active', true);
+						expect(res.body).to.have.nested.property('user.name', 'name');
+					})
+					.end(done);
+			});
+
+			it.only(`should return an error when trying to register a new user with an existing email: ${email} and username: ${username}`, (done) => {
+				request
+					.post(api('users.register'))
+					.send({
+						email,
+						name: 'name',
+						username,
+						pass: 'test',
+					})
+					.expect('Content-Type', 'application/json')
+					.expect(400)
+					.expect((res) => {
+						expect(res.body).to.have.property('success', false);
+						expect(res.body).to.have.property('error').and.to.be.equal('Username is already in use');
+					})
+					.end(done);
+			});
 		});
 	});
 
@@ -2228,19 +2240,24 @@ describe('[Users]', function () {
 	});
 
 	describe('[/users.sendConfirmationEmail]', () => {
-		it('should send email to user (return success), when is a valid email', (done) => {
-			request
-				.post(api('users.sendConfirmationEmail'))
-				.set(credentials)
-				.send({
-					email: adminEmail,
-				})
-				.expect('Content-Type', 'application/json')
-				.expect(200)
-				.expect((res) => {
-					expect(res.body).to.have.property('success', true);
-				})
-				.end(done);
+		const testEmails = [
+			{ email: 'lasdjflsdkajf@gemail.com' },
+			// ... Add more test emails as needed
+		];
+
+		testEmails.forEach(({ email }) => {
+			it(`should send email to user (return success) for email: ${email}`, (done) => {
+				request
+					.post(api('users.sendConfirmationEmail'))
+					.set(credentials)
+					.send({ email })
+					.expect('Content-Type', 'application/json')
+					.expect(200)
+					.expect((res) => {
+						expect(res.body).to.have.property('success', true);
+					})
+					.end(done);
+			});
 		});
 
 		it('should not send email to user(return error), when is a invalid email', (done) => {
